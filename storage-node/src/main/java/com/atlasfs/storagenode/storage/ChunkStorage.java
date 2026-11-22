@@ -50,7 +50,7 @@ public class ChunkStorage {
                     throw new IOException("Chunk ID already exists with different content.");
                 }
             }
-            Path tempPath = storageDirectory.resolve(chunkId + UUID.randomUUID() + ".tmp");
+            Path tempPath = storageDirectory.resolve(chunkId  + "-" + UUID.randomUUID() + ".tmp");
             Files.write(tempPath, data);
 
             Files.move(tempPath, chunkPath, StandardCopyOption.ATOMIC_MOVE);
