@@ -4,28 +4,51 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
 
 public class ChunkStorage {
     
     private Path storageDirectory;
 
-
+    
     public ChunkStorage(Path storageDirectory) throws IOException{
         this.storageDirectory=storageDirectory;
         Files.createDirectories(storageDirectory);
-
+        
         if(!Files.isDirectory(storageDirectory)){
             throw new IOException("Storage path is not a directory: "+storageDirectory);
         }
     }
+    
+    private String calculateChecksum(byte[] data) throws IOException{
+        try{
+            MessageDigest digest=MessageDigest.getInstance("SHA-256");
+            byte[] hash=digest.digest(data);
+            return java.util.HexFormat.of().formatHex(hash);
+        }
+        catch(java.security.NoSuchAlgorithmException e){
+            throw new IOException("SHA-256 algorithm not available", e);
+
+        }
+
+    }
 
     public String putChunk(String chunkId, byte[] data) throws IOException{
+        String checkSum=calculateChecksum(data);
         Path chunkPath=storageDirectory.resolve(chunkId+".chunk");
+        if(Files.exists(chunkPath)){
+            byte[] existingData=Files.readAllBytes(chunkPath);
+            String existingChecksum=calculateChecksum(existingData);
+            if(checkSum.equals(existingChecksum)) return checkSum;
+            else{
+                throw new IOException("Chunk ID already exists with different content.");
+            }
+        }
         Path tempPath=storageDirectory.resolve(chunkId+".tmp");
         Files.write(tempPath, data);
         Files.move(tempPath, chunkPath, StandardCopyOption.ATOMIC_MOVE);
 
-        return chunkPath.toString();
+        return checkSum;
     }
 
 
