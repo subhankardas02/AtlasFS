@@ -34,6 +34,13 @@ public class ChunkStorage {
 
     }
 
+
+    public byte[] getChunk(String chunkId) throws IOException{
+        Path chunkPath=storageDirectory.resolve(chunkId + ".chunk");
+        return Files.readAllBytes(chunkPath);
+
+    }
+
     public String putChunk(String chunkId, byte[] data) throws IOException {
         String checkSum = calculateChecksum(data);
         Object lock = chunkLocks.computeIfAbsent(chunkId, key -> new Object());

@@ -57,16 +57,24 @@ class ChunkStorageTest {
     @Test
     void shouldStoreExactChunkData() throws IOException {
         ChunkStorage storage = new ChunkStorage(tempDir);
-
         String chunkId = "chunk-004";
         byte[] originalData = "Hello AtlasFS".getBytes();
-
         storage.putChunk(chunkId, originalData);
-
         Path chunkPath = tempDir.resolve(chunkId + ".chunk");
         byte[] storedData = Files.readAllBytes(chunkPath);
-
         assertArrayEquals(originalData, storedData);
     }
+
+    @Test
+    void shouldRetrieveStoredChunkSuccessfully() throws IOException{
+        ChunkStorage storage=new ChunkStorage(tempDir);
+        String chunkId="chunk-005";
+        byte[] originalData="Hello AtlasFS".getBytes();
+        storage.putChunk(chunkId, originalData);
+        byte[] retrievedData=storage.getChunk(chunkId);
+        assertArrayEquals(originalData, retrievedData);
+
+    }
+
 
 }
