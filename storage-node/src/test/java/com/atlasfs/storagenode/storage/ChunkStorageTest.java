@@ -66,15 +66,37 @@ class ChunkStorageTest {
     }
 
     @Test
-    void shouldRetrieveStoredChunkSuccessfully() throws IOException{
-        ChunkStorage storage=new ChunkStorage(tempDir);
-        String chunkId="chunk-005";
-        byte[] originalData="Hello AtlasFS".getBytes();
+    void shouldRetrieveStoredChunkSuccessfully() throws IOException {
+        ChunkStorage storage = new ChunkStorage(tempDir);
+        String chunkId = "chunk-005";
+        byte[] originalData = "Hello AtlasFS".getBytes();
         storage.putChunk(chunkId, originalData);
-        byte[] retrievedData=storage.getChunk(chunkId);
+        byte[] retrievedData = storage.getChunk(chunkId);
         assertArrayEquals(originalData, retrievedData);
 
     }
 
+    @Test
+    void shouldDeleteChunkSuccessfully() throws IOException {
+        ChunkStorage storage = new ChunkStorage(tempDir);
+        String chunkId = "chunk-006";
+        Path chunkPath = tempDir.resolve(chunkId + ".chunk");
+        byte[] originalData = "Hello AtlasFS".getBytes();
+        storage.putChunk(chunkId, originalData);
+        boolean deleted = storage.deleteChunk(chunkId);
+
+        assertTrue(deleted);
+        assertFalse(Files.exists(chunkPath));
+
+    }
+
+    @Test
+    void shouldReturnFalseWhenChunkDoesNotExist() throws IOException {
+        ChunkStorage storage = new ChunkStorage(tempDir);
+
+        boolean deleted = storage.deleteChunk("nonexistent-chunk");
+
+        assertFalse(deleted);
+    }
 
 }

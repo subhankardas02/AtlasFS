@@ -71,4 +71,9 @@ public class ChunkStorage {
         return checkSum;
     }
 
+    public boolean deleteChunk(String chunkId) throws IOException{
+        Path chunkPath=storageDirectory.resolve(chunkId + ".chunk");
+        return Files.deleteIfExists(chunkPath);
+    }
+
 }
