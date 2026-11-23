@@ -51,9 +51,14 @@ public class ChunkStorage {
                 }
             }
             Path tempPath = storageDirectory.resolve(chunkId  + "-" + UUID.randomUUID() + ".tmp");
-            Files.write(tempPath, data);
+            try{
+                Files.write(tempPath, data);        
+                Files.move(tempPath, chunkPath, StandardCopyOption.ATOMIC_MOVE);
+            }
+            finally{
+                Files.deleteIfExists(tempPath);
+            }
 
-            Files.move(tempPath, chunkPath, StandardCopyOption.ATOMIC_MOVE);
         }
 
         return checkSum;
