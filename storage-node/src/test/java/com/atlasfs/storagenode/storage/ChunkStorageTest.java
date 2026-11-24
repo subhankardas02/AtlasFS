@@ -9,6 +9,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.ExecutionException;
 
 class ChunkStorageTest {
     @TempDir
@@ -103,32 +109,99 @@ class ChunkStorageTest {
     void shouldRejectChunkIdWithPathSeparators() {
         ChunkStorage storage = assertDoesNotThrow(() -> new ChunkStorage(tempDir));
 
-        assertThrows(IllegalArgumentException.class, () -> storage.putChunk("../secret", "data".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class,
+                () -> storage.putChunk("../secret", "data".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     void shouldRejectNullChunkId() throws IOException {
         ChunkStorage storage = new ChunkStorage(tempDir);
 
-        assertThrows(IllegalArgumentException.class, () -> storage.putChunk(null, "data".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class,
+                () -> storage.putChunk(null, "data".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     void shouldRejectEmptyChunkId() throws IOException {
         ChunkStorage storage = new ChunkStorage(tempDir);
 
-        assertThrows(IllegalArgumentException.class, () -> storage.putChunk("", "data".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalArgumentException.class,
+                () -> storage.putChunk("", "data".getBytes(StandardCharsets.UTF_8)));
     }
-    @Test 
-    void shouldReturnTrueWhenChunkExists() throws IOException{
-        ChunkStorage storage=new ChunkStorage(tempDir);
-        String chunkId="chunk-008";
-        byte[] chunkData="Hello World".getBytes(StandardCharsets.UTF_8);
+
+    @Test
+    void shouldReturnTrueWhenChunkExists() throws IOException {
+        ChunkStorage storage = new ChunkStorage(tempDir);
+        String chunkId = "chunk-008";
+        byte[] chunkData = "Hello World".getBytes(StandardCharsets.UTF_8);
         storage.putChunk(chunkId, chunkData);
 
         assertTrue(storage.exists(chunkId));
     }
 
+    @Test
+    void shouldPreventConcurrentWritesWithDifferentData() throws Exception {
 
+        ChunkStorage storage = new ChunkStorage(tempDir);
+
+        String chunkId = "concurrent-chunk";
+
+        byte[] dataA = "Thread A data".getBytes(StandardCharsets.UTF_8);
+        byte[] dataB = "Thread B data".getBytes(StandardCharsets.UTF_8);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        CountDownLatch latch = new CountDownLatch(1);
+
+        try {
+            Future<String> futureA = executor.submit(() -> {
+                latch.await();
+                return storage.putChunk(chunkId, dataA);
+            });
+
+            Future<String> futureB = executor.submit(() -> {
+                latch.await();
+                return storage.putChunk(chunkId, dataB);
+            });
+
+            // Release both threads at approximately the same time.
+            latch.countDown();
+
+            boolean successA = false;
+            boolean successB = false;
+
+            // Check Thread A
+            try {
+                futureA.get();
+                successA = true;
+            } catch (ExecutionException e) {
+                assertTrue(e.getCause() instanceof IOException);
+            }
+
+            // Check Thread B
+            try {
+                futureB.get();
+                successB = true;
+            } catch (ExecutionException e) {
+                assertTrue(e.getCause() instanceof IOException);
+            }
+
+            // Exactly one thread should succeed.
+            assertNotEquals(successA, successB);
+
+            // The successfully written chunk must exist
+            assertTrue(storage.exists(chunkId));
+
+            // Verify that the stored content belongs to the winning thread.
+            byte[] storedData = storage.getChunk(chunkId);
+
+            assertTrue(
+                    Arrays.equals(storedData, dataA) ||
+                            Arrays.equals(storedData, dataB));
+
+        } finally {
+            executor.shutdown();
+        }
+    }
 
 }
