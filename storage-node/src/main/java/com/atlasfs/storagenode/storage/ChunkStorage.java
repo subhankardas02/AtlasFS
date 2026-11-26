@@ -88,11 +88,20 @@ public class ChunkStorage {
             if (Files.exists(chunkPath)) {
                 byte[] existingData = Files.readAllBytes(chunkPath);
                 String existingChecksum = calculateChecksum(existingData);
-                if (checkSum.equals(existingChecksum))
-                    return checkSum;
-                else {
-                    throw new IOException("Chunk ID already exists with different content.");
+                Path checksumPath=storageDirectory.resolve(chunkId+".checksum");
+
+                if(!Files.exists(checksumPath)){
+                    throw new IOException("Checksum file missing: "+chunkId);
                 }
+                String storedChecksum=Files.readString(checksumPath);
+                if(!existingChecksum.equals(storedChecksum)){
+                    throw new IOException("Existing chunk is corrupted");
+                }
+                if(checkSum.equals(existingChecksum)){
+                    return checkSum;
+                }
+
+                throw new IOException("Chunk ID already exists with different content.");
             }
             Path tempPath = storageDirectory.resolve(chunkId + "-" + UUID.randomUUID() + ".tmp");
             try {
@@ -115,7 +124,13 @@ public class ChunkStorage {
         Object lock = getLock(chunkId);
         synchronized (lock) {
             Path chunkPath = storageDirectory.resolve(chunkId + ".chunk");
-            return Files.deleteIfExists(chunkPath);
+            Path checksumPath = storageDirectory.resolve(chunkId + ".checksum");
+
+            boolean deleted = Files.deleteIfExists(chunkPath);
+
+            Files.deleteIfExists(checksumPath);
+
+            return deleted;
         }
     }
 
