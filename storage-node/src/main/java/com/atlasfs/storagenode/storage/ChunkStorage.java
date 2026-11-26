@@ -8,19 +8,19 @@ import java.security.MessageDigest;
 import java.util.UUID;
 
 public class ChunkStorage {
-    private static final int MAX_LOCK_COUNT=1000;
+    private static final int MAX_LOCK_COUNT = 1000;
     private final Object[] locks;
     private final Path storageDirectory;
-    
-    private Object getLock(String chunkId){
+
+    private Object getLock(String chunkId) {
         return locks[Math.floorMod(chunkId.hashCode(), MAX_LOCK_COUNT)];
     }
 
     public ChunkStorage(Path storageDirectory) throws IOException {
         this.storageDirectory = storageDirectory;
-        this.locks=new Object[MAX_LOCK_COUNT];
-        for(int i=0; i<MAX_LOCK_COUNT; i++){
-            locks[i]=new Object();
+        this.locks = new Object[MAX_LOCK_COUNT];
+        for (int i = 0; i < MAX_LOCK_COUNT; i++) {
+            locks[i] = new Object();
         }
         Files.createDirectories(storageDirectory);
 
@@ -49,11 +49,27 @@ public class ChunkStorage {
 
     public byte[] getChunk(String chunkId) throws IOException {
         validateChunkId(chunkId);
-        Object lock=getLock(chunkId);
-        synchronized(lock){
+        Object lock = getLock(chunkId);
+        synchronized (lock) {
             Path chunkPath = storageDirectory.resolve(chunkId + ".chunk");
-            return Files.readAllBytes(chunkPath);
+            Path checksumPath = storageDirectory.resolve(chunkId + ".checksum");
 
+            if (!Files.exists(chunkPath)) {
+                throw new IOException("Chunk not found: " + chunkId);
+            }
+            if (!Files.exists(checksumPath)) {
+                throw new IOException("Checksum file missing: " + chunkId);
+            }
+
+            byte[] data = Files.readAllBytes(chunkPath);
+            String storedChecksum = Files.readString(checksumPath);
+            String actualChecksum = calculateChecksum(data);
+
+            if (!storedChecksum.equals(actualChecksum)) {
+                throw new IOException("Chunk checksum verification failed: " + chunkId);
+            }
+
+            return data;
         }
 
     }
@@ -82,6 +98,9 @@ public class ChunkStorage {
             try {
                 Files.write(tempPath, data);
                 Files.move(tempPath, chunkPath, StandardCopyOption.ATOMIC_MOVE);
+                Path checksumPath = storageDirectory.resolve(chunkId + ".checksum");
+                Files.writeString(checksumPath, checkSum);
+
             } finally {
                 Files.deleteIfExists(tempPath);
             }
@@ -93,18 +112,18 @@ public class ChunkStorage {
 
     public boolean deleteChunk(String chunkId) throws IOException {
         validateChunkId(chunkId);
-        Object lock=getLock(chunkId);
-        synchronized(lock){
+        Object lock = getLock(chunkId);
+        synchronized (lock) {
             Path chunkPath = storageDirectory.resolve(chunkId + ".chunk");
             return Files.deleteIfExists(chunkPath);
         }
     }
 
-    public boolean exists(String chunkId) throws IOException{
+    public boolean exists(String chunkId) throws IOException {
         validateChunkId(chunkId);
-        Object lock=getLock(chunkId);
-        synchronized(lock){
-            Path chunkPath=storageDirectory.resolve(chunkId + ".chunk");
+        Object lock = getLock(chunkId);
+        synchronized (lock) {
+            Path chunkPath = storageDirectory.resolve(chunkId + ".chunk");
             return Files.exists(chunkPath);
         }
 
