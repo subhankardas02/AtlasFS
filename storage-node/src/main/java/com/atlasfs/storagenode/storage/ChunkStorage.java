@@ -7,6 +7,9 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.UUID;
 
+import org.springframework.stereotype.Component;
+
+@Component 
 public class ChunkStorage {
     private static final int MAX_LOCK_COUNT = 1000;
     private final Object[] locks;
